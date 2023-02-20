@@ -146,6 +146,11 @@ fn main()
 
     let remaining_words = filter_words(constraint, &words);
     println!("{}/{} words remaining", remaining_words.len(), words.len());
+    if remaining_words.len() < 10 {
+        for w in &remaining_words {
+            println!("  {}", w)
+        }
+    }
 
     let mut best_score = 0;
     let mut best_guess : &String = words.first().unwrap();
