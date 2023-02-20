@@ -20,18 +20,17 @@ struct CharacterConstraint {
 
 #[derive(Debug)]
 struct Constraint {
-    character: Vec<CharacterConstraint>,
-    does_not_contain: HashSet<char>
+    character: Vec<CharacterConstraint>
 }
 
 impl Constraint {
     pub fn new(size: usize) -> Self {
         let character = vec![CharacterConstraint {is: None, is_not: HashSet::new() }; size];
-        Self { character, does_not_contain: HashSet::new() }
+        Self { character }
     }
 
     pub fn score(self) -> usize {
-        let mut s = self.does_not_contain.len();
+        let mut s = 0;
         for c in self.character {
             s += if c.is != None { 10 } else { 0 };
             s += c.is_not.len();
@@ -46,10 +45,8 @@ fn wordle_guess(guess: &str, answer: &str) -> Constraint
     for (i, (g, a)) in guess.chars().zip(answer.chars()).enumerate() {
         if g == a {
             constraint.character[i].is = Some(g);
-        } else if answer.contains(g) {
-            constraint.character[i].is_not.insert(g);
         } else {
-            constraint.does_not_contain.insert(g);
+            constraint.character[i].is_not.insert(g);
         }
     }
     constraint
@@ -62,7 +59,7 @@ fn filter_words(constraint: Constraint, words: &Vec<String>) -> Vec<&String>
     for word in words {
         if
             // Word must not contain letters that aren't present.
-            !constraint.does_not_contain.iter().any(|&x| word.contains(x)) &&
+            // !constraint.does_not_contain.iter().any(|&x| word.contains(x)) &&
             // Check that green letters are where they should be.
             constraint.character.iter().zip(word.chars())
                     .all(|(cc, y)| 
@@ -135,8 +132,8 @@ fn main()
                 x => {
                     match op {
                         Op::Is => constraint.character[i].is = Some(x),
-                        Op::IsNot => {constraint.character[i].is_not.insert(x); ()},
-                        Op::Exclude => {constraint.does_not_contain.insert(x); ()}
+                        Op::IsNot | Op::Exclude => {constraint.character[i].is_not.insert(x); ()},
+                        //Op::Exclude => {constraint.does_not_contain.insert(x); ()}
                     }
                 }
             }
