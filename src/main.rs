@@ -84,7 +84,7 @@ impl Constraint {
         let mut s = self.min_occurrence.values().sum();
         s += self.max_occurrence.len();
         for cc in self.character {
-            s += if cc.is != None { 10 } else { 0 };
+            s += if cc.is != None { 2 } else { 0 };
             s += cc.is_not.len();
         }
         s
@@ -154,7 +154,7 @@ fn wordle_guess(guess: &str, answer: &str) -> Constraint
     constraint
 }
 
-fn filter_words(constraint: Constraint, words: &Vec<String>) -> Vec<&String>
+fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<String>) -> Vec<&'a String>
 {
     let mut v = Vec::new();
 
@@ -182,13 +182,14 @@ fn filter_words(constraint: Constraint, words: &Vec<String>) -> Vec<&String>
     v
 }
 
-fn score_guess(guess: &str, words: &Vec<&String>) -> usize
+fn score_guess(guess: &str, words: &Vec<&String>, constraint: &Constraint) -> usize
 {
     let mut score = 0;
     for answer in words {
         // If the word is `word`, then how good is this guess?
-        let constraint = wordle_guess(guess, answer);
-        score += constraint.score();
+        let mut answer_constraint = wordle_guess(guess, answer);
+        answer_constraint.update(&constraint);
+        score += answer_constraint.score();
     }
     score
 }
@@ -227,7 +228,7 @@ fn main()
         constraint_acc.update(&constraint);
     }
 
-    let remaining_words = filter_words(constraint_acc, &words);
+    let remaining_words = filter_words(&constraint_acc, &words);
     println!("{}/{} words remaining", remaining_words.len(), words.len());
     if remaining_words.len() < 15 {
         for w in &remaining_words {
@@ -238,7 +239,7 @@ fn main()
     let mut best_score = 0;
     let mut best_guess : &String = words.first().unwrap();
     for guess in &words {
-        let score = score_guess(guess.as_str(), &remaining_words);
+        let score = score_guess(guess.as_str(), &remaining_words, &constraint_acc);
         if score > best_score {
             best_score = score;
             best_guess = guess;
