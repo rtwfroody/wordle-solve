@@ -23,7 +23,8 @@ struct CharacterConstraint {
 struct Constraint {
     character: Vec<CharacterConstraint>,
     // For each char, track how many there are at least in the word.
-    min_occurrence: HashMap<char, usize>
+    min_occurrence: HashMap<char, usize>,
+    max_occurrence: HashMap<char, usize>
 }
 
 impl Constraint {
@@ -31,7 +32,8 @@ impl Constraint {
         let character = vec![CharacterConstraint {is: None, is_not: HashSet::new() }; size];
         Self {
             character,
-            min_occurrence: HashMap::new()
+            min_occurrence: HashMap::new(),
+            max_occurrence: HashMap::new()
         }
     }
 
@@ -44,6 +46,8 @@ impl Constraint {
             Gray
         }
         let mut op = Op::Green;
+        let mut count: HashMap<char, usize> = HashMap::new();
+        let mut found_max = HashSet::new();
         for c in string.chars() {
             match c {
                 ' ' => { i += 1; op = Op::Green; },
@@ -53,25 +57,32 @@ impl Constraint {
                     match op {
                         Op::Green => {
                             constraint.character[i].is = Some(x);
-                            constraint.increment_min_occurrence(&x)
+                            constraint.increment_min_occurrence(&x);
+                            count.entry(x).and_modify(|x| *x += 1).or_insert(1);
                         },
                         Op::Yellow => {
                             constraint.character[i].is_not.insert(x);
-                            constraint.increment_min_occurrence(&x)
+                            constraint.increment_min_occurrence(&x);
+                            count.entry(x).and_modify(|x| *x += 1).or_insert(1);
                         },
                         Op::Gray => {
                             constraint.character[i].is_not.insert(x);
+                            found_max.insert(x);
                             ()
                         }
                     }
                 }
             }
         }
+        for c in found_max {
+            constraint.max_occurrence.insert(c, *count.get(&c).unwrap_or(&0));
+        }
         constraint
     }
 
     pub fn score(self) -> usize {
         let mut s = self.min_occurrence.values().sum();
+        s += self.max_occurrence.len();
         for cc in self.character {
             s += if cc.is != None { 10 } else { 0 };
             s += cc.is_not.len();
@@ -87,6 +98,11 @@ impl Constraint {
         for (c, count) in constraint.min_occurrence.iter() {
             self.min_occurrence.entry(*c)
                     .and_modify(|v| *v = cmp::max(*v, *count))
+                    .or_insert(*count);
+        }
+        for (c, count) in constraint.max_occurrence.iter() {
+            self.max_occurrence.entry(*c)
+                    .and_modify(|v| *v = cmp::min(*v, *count))
                     .or_insert(*count);
         }
         for (my_c, other_c) in self.character.iter_mut().zip(constraint.character.iter()) {
@@ -118,7 +134,6 @@ fn wordle_guess(guess: &str, answer: &str) -> Constraint
             constraint.character[i].is = Some(g);
         } else {
             constraint.character[i].is_not.insert(g);
-            // TODO: increment_min_occurrence() if this character exists elsewhere in the word
         }
     }
 
@@ -127,9 +142,12 @@ fn wordle_guess(guess: &str, answer: &str) -> Constraint
 
     for (c, guess_count) in guess_frequency.iter() {
         let answer_count = answer_frequency.get(c).unwrap_or(&0);
-        let constraint_count = cmp::min(guess_count, answer_count);
-        if constraint_count > &0 {
-            constraint.min_occurrence.insert(*c, *constraint_count);
+        let min_count = cmp::min(guess_count, answer_count);
+        if min_count > &0 {
+            constraint.min_occurrence.insert(*c, *min_count);
+        }
+        if guess_count > answer_count {
+            constraint.max_occurrence.insert(*c, *answer_count);
         }
     }
 
@@ -145,6 +163,8 @@ fn filter_words(constraint: Constraint, words: &Vec<String>) -> Vec<&String>
         if
             constraint.min_occurrence.iter()
                     .all(|(key, value)| char_frequency.get(key).unwrap_or(&0) >= value) &&
+            constraint.max_occurrence.iter()
+                    .all(|(key, value)| char_frequency.get(key).unwrap_or(&0) <= value) &&
             // Check that green letters are where they should be.
             constraint.character.iter().zip(word.chars())
                     .all(|(cc, y)| 
