@@ -1,8 +1,9 @@
+use clap::Parser;
+use indicatif::{ProgressIterator, ProgressStyle};
+use std::cmp;
+use std::collections::{HashSet, HashMap};
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::collections::{HashSet, HashMap};
-use clap::Parser;
-use std::cmp;
 use std::str::Chars;
 
 #[derive(Parser)]
@@ -81,6 +82,7 @@ impl Constraint {
         constraint
     }
 
+    /*
     pub fn score(self) -> usize {
         let mut s = self.min_occurrence.values().sum();
         s += self.max_occurrence.len();
@@ -90,6 +92,7 @@ impl Constraint {
         }
         s
     }
+    */
 
     pub fn increment_min_occurrence(&mut self, c: &char) {
         self.min_occurrence.entry(*c).and_modify(|n| *n += 1).or_insert(1);
@@ -212,6 +215,7 @@ fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<Word>) -> Vec<&'a Wo
     v
 }
 
+/*
 fn score_guess_heuristic(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
 {
     let mut score = 0;
@@ -223,6 +227,7 @@ fn score_guess_heuristic(guess: &Word, words: &Vec<&Word>, constraint: &Constrai
     }
     score
 }
+*/
 
 fn score_guess_count_eliminations(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
 {
@@ -291,9 +296,11 @@ fn main()
         return;
     }
 
+    let style = ProgressStyle::with_template("{bar:60} {pos}/{len} {eta}").unwrap();
+
     let mut best_score = 0;
     let mut best_guess = words.first().unwrap();
-    for guess in &words {
+    for guess in words.iter().progress_with_style(style) {
         let score = score_guess_count_eliminations(guess, &remaining_words, &constraint_acc);
         if score > best_score {
             best_score = score;
