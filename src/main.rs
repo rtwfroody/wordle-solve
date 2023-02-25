@@ -266,7 +266,7 @@ fn main()
     let mut constraint_acc = Constraint::new(word_length);
     for constraint_string in cli.information {
         let constraint = Constraint::from_string(&constraint_string, word_length);
-        println!("Constraint: {:?}", constraint);
+        //println!("Constraint: {:?}", constraint);
         constraint_acc.update(&constraint);
     }
 
@@ -299,7 +299,7 @@ fn main()
             best_score = score;
             best_guess = guess;
         }
-        println!("  {} -> {}", guess.word, score);
+        //println!("  {} -> {}", guess.word, score);
     }
     println!("Best guess: {}", best_guess.word);
 }
