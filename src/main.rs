@@ -3,6 +3,7 @@ use std::io::{self, BufRead};
 use std::collections::{HashSet, HashMap};
 use clap::Parser;
 use std::cmp;
+use std::str::Chars;
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -115,18 +116,63 @@ impl Constraint {
             }
         }
     }
+
+    pub fn allows(&self, word: &Word) -> bool
+    {
+        self.min_occurrence.iter()
+                .all(|(key, value)| word.char_count(key) >= *value) &&
+        self.max_occurrence.iter()
+                .all(|(key, value)| word.char_count(key) <= *value) &&
+        // Check that green letters are where they should be.
+        self.character.iter().zip(word.chars())
+                .all(|(cc, y)|
+                        match cc.is {
+                            None => true,
+                            Some(x) => x == y
+                        }) &&
+        self.character.iter().zip(word.chars())
+                .all(|(cc, y)| !cc.is_not.contains(&y))
+    }
 }
 
-fn char_frequency(word: &str) -> HashMap<char, usize>
+struct Word {
+    word: String,
+    char_frequency: HashMap<char, usize>
+}
+
+impl Word {
+    pub fn new(word: String) -> Self
+    {
+        let char_frequency = char_frequency(word.chars());
+        Self { word, char_frequency }
+    }
+
+    pub fn char_count(&self, c: &char) -> usize
+    {
+        *self.char_frequency.get(c).unwrap_or(&0)
+    }
+
+    pub fn chars(&self) -> Chars<'_>
+    {
+        self.word.chars()
+    }
+
+    pub fn len(&self) -> usize
+    {
+        self.word.len()
+    }
+}
+
+fn char_frequency(chars: Chars) -> HashMap<char, usize>
 {
     let mut char_frequency = HashMap::new();
-    for c in word.chars() {
+    for c in chars {
         char_frequency.entry(c).and_modify(|n| *n += 1).or_insert(1);
     }
     char_frequency
 }
 
-fn wordle_guess(guess: &str, answer: &str) -> Constraint
+fn wordle_guess(guess: &Word, answer: &Word) -> Constraint
 {
     let mut constraint: Constraint = Constraint::new(guess.len());
     for (i, (g, a)) in guess.chars().zip(answer.chars()).enumerate() {
@@ -137,44 +183,28 @@ fn wordle_guess(guess: &str, answer: &str) -> Constraint
         }
     }
 
-    let guess_frequency = char_frequency(guess);
-    let answer_frequency = char_frequency(answer);
+    let guess_frequency = char_frequency(guess.chars());
 
     for (c, guess_count) in guess_frequency.iter() {
-        let answer_count = answer_frequency.get(c).unwrap_or(&0);
-        let min_count = cmp::min(guess_count, answer_count);
-        if min_count > &0 {
-            constraint.min_occurrence.insert(*c, *min_count);
+        let answer_count = answer.char_count(c);
+        let min_count = cmp::min(*guess_count, answer_count);
+        if min_count > 0 {
+            constraint.min_occurrence.insert(*c, min_count);
         }
-        if guess_count > answer_count {
-            constraint.max_occurrence.insert(*c, *answer_count);
+        if *guess_count > answer_count {
+            constraint.max_occurrence.insert(*c, answer_count);
         }
     }
 
     constraint
 }
 
-fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<String>) -> Vec<&'a String>
+fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<Word>) -> Vec<&'a Word>
 {
     let mut v = Vec::new();
 
     for word in words {
-        let char_frequency = char_frequency(word.as_str());
-        if
-            constraint.min_occurrence.iter()
-                    .all(|(key, value)| char_frequency.get(key).unwrap_or(&0) >= value) &&
-            constraint.max_occurrence.iter()
-                    .all(|(key, value)| char_frequency.get(key).unwrap_or(&0) <= value) &&
-            // Check that green letters are where they should be.
-            constraint.character.iter().zip(word.chars())
-                    .all(|(cc, y)| 
-                            match cc.is {
-                                None => true,
-                                Some(x) => x == y
-                            }) &&
-            constraint.character.iter().zip(word.chars())
-                    .all(|(cc, y)| !cc.is_not.contains(&y))
-        {
+        if constraint.allows(word) {
             v.push(word);
         }
     }
@@ -182,7 +212,7 @@ fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<String>) -> Vec<&'a 
     v
 }
 
-fn score_guess(guess: &str, words: &Vec<&String>, constraint: &Constraint) -> usize
+fn score_guess_heuristic(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
 {
     let mut score = 0;
     for answer in words {
@@ -194,7 +224,19 @@ fn score_guess(guess: &str, words: &Vec<&String>, constraint: &Constraint) -> us
     score
 }
 
-fn read_words(path: &String, word_length: usize) -> Vec<String>
+fn score_guess_count_eliminations(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
+{
+    let mut score = words.len() * words.len();
+    for answer in words {
+        // If the word is `word`, then how good is this guess?
+        let mut answer_constraint = wordle_guess(guess, answer);
+        answer_constraint.update(&constraint);
+        score -= words.iter().filter(|w| answer_constraint.allows(w)).count();
+    }
+    score
+}
+
+fn read_words(path: &String, word_length: usize) -> Vec<Word>
 {
     let mut words = Vec::new();
 
@@ -208,7 +250,7 @@ fn read_words(path: &String, word_length: usize) -> Vec<String>
         if line.chars().count() != word_length {
             continue;
         }
-        words.push(line);
+        words.push(Word::new(line));
     }
     words
 }
@@ -229,21 +271,35 @@ fn main()
     }
 
     let remaining_words = filter_words(&constraint_acc, &words);
+    if remaining_words.len() < 1 {
+        println!("Error: No words match those constraints.");
+        return;
+    }
+    if remaining_words.len() == 1 {
+        println!("Answer: {}", remaining_words.first().unwrap().word);
+        return;
+    }
     println!("{}/{} words remaining", remaining_words.len(), words.len());
     if remaining_words.len() < 15 {
         for w in &remaining_words {
-            println!("  {}", w)
+            println!("  {}", w.word)
         }
     }
 
+    if remaining_words.len() == 2 {
+        println!("Guess: {}", remaining_words.first().unwrap().word);
+        return;
+    }
+
     let mut best_score = 0;
-    let mut best_guess : &String = words.first().unwrap();
+    let mut best_guess = words.first().unwrap();
     for guess in &words {
-        let score = score_guess(guess.as_str(), &remaining_words, &constraint_acc);
+        let score = score_guess_count_eliminations(guess, &remaining_words, &constraint_acc);
         if score > best_score {
             best_score = score;
             best_guess = guess;
         }
+        println!("  {} -> {}", guess.word, score);
     }
-    println!("Best guess: {}", best_guess);
+    println!("Best guess: {}", best_guess.word);
 }
