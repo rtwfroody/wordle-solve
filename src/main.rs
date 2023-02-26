@@ -19,7 +19,13 @@ struct Cli {
     #[arg(short, long, value_name = "FILE")]
     words: Option<String>,
     /// One or more wordle result rows.
-    constraint: Vec<String>
+    constraint: Vec<String>,
+    /// See how the algorithm performs against the given word.
+    #[arg(short, long, value_name = "TEST")]
+    test: Option<String>,
+    /// See how the algorithm performs against every word.
+    #[arg(short, long)]
+    full_test: bool
 }
 
 #[derive(Clone)]
@@ -146,6 +152,7 @@ impl Constraint {
     }
 }
 
+#[derive(Clone)]
 struct Word {
     word: String,
     char_frequency: HashMap<char, usize>
@@ -268,13 +275,108 @@ fn read_words(path: &String, word_length: usize) -> Vec<Word>
     words
 }
 
+fn best_guess<'a>(words: &'a Vec<Word>, constraint: &Constraint, verbose: bool) ->
+        Result<&'a Word, String>
+{
+    let remaining_words = filter_words(constraint, &words);
+
+    if remaining_words.len() == words.len() {
+        // TODO: return cached word
+    }
+
+    if remaining_words.len() < 1 {
+        return Err("Error: No words match those constraints.".to_string());
+    }
+    if remaining_words.len() == 1 {
+        return Ok(remaining_words.first().unwrap());
+    }
+    if verbose {
+        println!("{}/{} words remaining", remaining_words.len(), words.len());
+        if remaining_words.len() < 15 {
+            for w in &remaining_words {
+                println!("  {}", w.word)
+            }
+        }
+    }
+
+    if remaining_words.len() == 2 {
+        return Ok(remaining_words.first().unwrap());
+    }
+
+    let style = ProgressStyle::with_template("{bar:60} {pos}/{len} {eta}").unwrap();
+
+    let mut best_score = 0;
+    let mut best_guess = words.first().unwrap();
+    for guess in words.iter().progress_with_style(style) {
+        let score = score_guess_count_eliminations(guess, &remaining_words, constraint);
+        if score > best_score {
+            best_score = score;
+            best_guess = guess;
+        }
+    }
+
+    if remaining_words.len() == words.len() {
+        // TODO: update cached word
+    }
+
+    Ok(best_guess)
+}
+
+/// Return how many guesses it took to find the word.
+fn test<'a>(words: &'a Vec<Word>, answer: &Word, verbose: bool) -> Vec<&'a Word>
+{
+    let mut result = Vec::new();
+    let word_length = words.first().unwrap().len();
+    let mut constraint = Constraint::new(word_length);
+    for _ in 1..100 {
+        let guess = best_guess(&words, &constraint, false).unwrap();
+        result.push(guess);
+        if verbose {
+            println!("Guess: {}", guess.word);
+        }
+        if guess.word.eq(&answer.word) {
+            return result;
+        }
+        let guess_constraint = wordle_guess(&guess, answer);
+        constraint.update(&guess_constraint);
+    }
+    return result;
+}
+
+fn full_test(words: &Vec<Word>)
+{
+    let mut result = HashMap::new();
+    for word in words {
+        let guesses = test(words, &word, false);
+        print!("Guessed {} from", word.word);
+        let count = guesses.len();
+        result.entry(count).and_modify(|c| *c += 1).or_insert(1);
+        for guess in guesses {
+            print!(" {}", guess.word);
+        }
+        println!();
+    }
+
+    println!("{:?}", result);
+}
+
 fn main()
 {
     let cli = Cli::parse();
 
     let word_length = 5;
-
     let words = read_words(&cli.words.unwrap_or("words".to_string()), word_length);
+
+    if cli.test.is_some() {
+        let answer = Word::new(cli.test.unwrap());
+        test(&words, &answer, true);
+        return;
+    }
+
+    if cli.full_test {
+        full_test(&words);
+        return;
+    }
 
     let mut constraint_acc = Constraint::new(word_length);
     for constraint_string in cli.constraint {
@@ -283,38 +385,7 @@ fn main()
         constraint_acc.update(&constraint);
     }
 
-    let remaining_words = filter_words(&constraint_acc, &words);
-    if remaining_words.len() < 1 {
-        println!("Error: No words match those constraints.");
-        return;
-    }
-    if remaining_words.len() == 1 {
-        println!("Answer: {}", remaining_words.first().unwrap().word);
-        return;
-    }
-    println!("{}/{} words remaining", remaining_words.len(), words.len());
-    if remaining_words.len() < 15 {
-        for w in &remaining_words {
-            println!("  {}", w.word)
-        }
-    }
+    let guess = best_guess(&words, &constraint_acc, true).unwrap();
 
-    if remaining_words.len() == 2 {
-        println!("Guess: {}", remaining_words.first().unwrap().word);
-        return;
-    }
-
-    let style = ProgressStyle::with_template("{bar:60} {pos}/{len} {eta}").unwrap();
-
-    let mut best_score = 0;
-    let mut best_guess = words.first().unwrap();
-    for guess in words.iter().progress_with_style(style) {
-        let score = score_guess_count_eliminations(guess, &remaining_words, &constraint_acc);
-        if score > best_score {
-            best_score = score;
-            best_guess = guess;
-        }
-        //println!("  {} -> {}", guess.word, score);
-    }
-    println!("Best guess: {}", best_guess.word);
+    println!("Best guess: {}", guess.word);
 }
