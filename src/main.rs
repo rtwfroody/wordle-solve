@@ -24,7 +24,7 @@ struct Cli {
     #[arg(short, long, value_name = "TEST")]
     test: Option<String>,
     /// See how the algorithm performs against every word.
-    #[arg(short, long)]
+    #[arg(long)]
     full_test: bool
 }
 
