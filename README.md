@@ -1,7 +1,8 @@
 # Introduction
 
-wordle-solve finds the best(?) wordle guess. It should work with any unicode
-list of words, so should work for any language where wordle makes sense.
+wordle-solve finds the best wordle guess. Or at least it solves any word in the
+word list in 5 guess or fewer. It should work with any unicode list of words,
+so should work for any language where wordle makes sense.
 
 # Usage
 
