@@ -7,11 +7,19 @@ use std::io::{self, BufRead};
 use std::str::Chars;
 
 #[derive(Parser)]
+/// Print out the next best (hopefully) guess when solving a wordle puzzle.
+///
+/// Each constraint describes a single wordle result row. Put a - in front of
+/// each character that is gray, a ~ in front of each character that is yellow,
+/// and leave the green ones as is.
+///
+/// Example: wordle-solve -- "-r -a ~i -s -e" "-h -o ~t -l y"
 #[command(author, version, about)]
 struct Cli {
     #[arg(short, long, value_name = "FILE")]
     words: Option<String>,
-    information: Vec<String>
+    /// One or more wordle result rows.
+    constraint: Vec<String>
 }
 
 #[derive(Clone)]
@@ -269,7 +277,7 @@ fn main()
     let words = read_words(&cli.words.unwrap_or("words".to_string()), word_length);
 
     let mut constraint_acc = Constraint::new(word_length);
-    for constraint_string in cli.information {
+    for constraint_string in cli.constraint {
         let constraint = Constraint::from_string(&constraint_string, word_length);
         //println!("Constraint: {:?}", constraint);
         constraint_acc.update(&constraint);
