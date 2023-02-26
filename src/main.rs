@@ -275,13 +275,23 @@ fn read_words(path: &String, word_length: usize) -> Vec<Word>
     words
 }
 
+struct Cache {
+    first_guess: Option<Word>
+}
+static mut CACHE : Cache = Cache { first_guess: None };
+
 fn best_guess<'a>(words: &'a Vec<Word>, constraint: &Constraint, verbose: bool) ->
         Result<&'a Word, String>
 {
     let remaining_words = filter_words(constraint, &words);
 
     if remaining_words.len() == words.len() {
-        // TODO: return cached word
+        unsafe {
+            match &CACHE.first_guess {
+                Some(w) => return Ok(w),
+                None => ()
+            }
+        }
     }
 
     if remaining_words.len() < 1 {
@@ -316,7 +326,9 @@ fn best_guess<'a>(words: &'a Vec<Word>, constraint: &Constraint, verbose: bool) 
     }
 
     if remaining_words.len() == words.len() {
-        // TODO: update cached word
+        unsafe {
+            CACHE.first_guess = Some(Word::new(best_guess.word.clone()));
+        }
     }
 
     Ok(best_guess)
