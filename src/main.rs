@@ -153,9 +153,22 @@ impl Constraint {
 }
 
 #[derive(Clone)]
+#[derive(PartialEq, Eq)]
 struct Word {
     word: String,
     char_frequency: HashMap<char, usize>
+}
+
+impl Ord for Word{
+    fn cmp(&self, other: &Self) -> cmp::Ordering {
+        self.word.cmp(&other.word)
+    }
+}
+
+impl PartialOrd for Word{
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        self.word.partial_cmp(&other.word)
+    }
 }
 
 impl Word {
@@ -315,15 +328,12 @@ fn best_guess<'a>(words: &'a Vec<Word>, constraint: &Constraint, verbose: bool) 
 
     let style = ProgressStyle::with_template("{bar:60} {pos}/{len} {eta}").unwrap();
 
-    let mut best_score = 0;
-    let mut best_guess = words.first().unwrap();
-    for guess in words.iter().progress_with_style(style) {
-        let score = score_guess_count_eliminations(guess, &remaining_words, constraint);
-        if score > best_score {
-            best_score = score;
-            best_guess = guess;
-        }
-    }
+    let (_best_score, best_guess) =
+        words.iter()
+                .progress_with_style(style)
+                .map(|guess| (score_guess_count_eliminations(guess, &remaining_words, constraint), guess))
+                .max()
+                .unwrap();
 
     if remaining_words.len() == words.len() {
         unsafe {
