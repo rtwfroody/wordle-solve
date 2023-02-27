@@ -1,5 +1,6 @@
 use clap::Parser;
-use indicatif::{ProgressIterator, ProgressStyle};
+use indicatif::{ParallelProgressIterator, ProgressStyle};
+use rayon::prelude::*;
 use std::cmp;
 use std::collections::{HashSet, HashMap};
 use std::fs::File;
@@ -329,7 +330,8 @@ fn best_guess<'a>(words: &'a Vec<Word>, constraint: &Constraint, verbose: bool) 
     let style = ProgressStyle::with_template("{bar:60} {pos}/{len} {eta}").unwrap();
 
     let (_best_score, best_guess) =
-        words.iter()
+        words
+                .par_iter()
                 .progress_with_style(style)
                 .map(|guess| (score_guess_count_eliminations(guess, &remaining_words, constraint), guess))
                 .max()
