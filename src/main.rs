@@ -100,18 +100,6 @@ impl Constraint {
         constraint
     }
 
-    /*
-    pub fn score(self) -> usize {
-        let mut s = self.min_occurrence.values().sum();
-        s += self.max_occurrence.len();
-        for cc in self.character {
-            s += if cc.is != None { 2 } else { 0 };
-            s += cc.is_not.len();
-        }
-        s
-    }
-    */
-
     pub fn increment_min_occurrence(&mut self, c: &char) {
         self.min_occurrence.entry(*c).and_modify(|n| *n += 1).or_insert(1);
     }
@@ -247,20 +235,6 @@ fn filter_words<'a>(constraint: &Constraint, words: &'a Vec<Word>) -> Vec<&'a Wo
     v
 }
 
-/*
-fn score_guess_heuristic(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
-{
-    let mut score = 0;
-    for answer in words {
-        // If the word is `word`, then how good is this guess?
-        let mut answer_constraint = wordle_guess(guess, answer);
-        answer_constraint.update(&constraint);
-        score += answer_constraint.score();
-    }
-    score
-}
-*/
-
 fn score_guess_count_eliminations(guess: &Word, words: &Vec<&Word>, constraint: &Constraint) -> usize
 {
     let mut score = words.len() * words.len();
@@ -299,7 +273,6 @@ struct WordleSolver {
 }
 
 lazy_static! {
-    //static ref FIRST_GUESS: Mutex<Option<Word>> = Mutex::new(None);
     static ref FIRST_GUESS: Mutex<Option<usize>> = Mutex::new(None);
 }
 
@@ -310,11 +283,6 @@ impl WordleSolver {
         let remaining_words = filter_words(constraint, &self.words);
 
         if remaining_words.len() == self.words.len() {
-            /*
-            if let Some(w) = &*FIRST_GUESS.lock().unwrap() {
-                return Ok(&w.clone());
-            }
-            */
             let first_guess = FIRST_GUESS.lock().unwrap();
             if let Some(index) = *first_guess {
                 return Ok(&self.words[index]);
@@ -423,7 +391,6 @@ fn main()
     let mut constraint_acc = Constraint::new(word_length);
     for constraint_string in cli.constraint {
         let constraint = Constraint::from_string(&constraint_string, word_length);
-        //println!("Constraint: {:?}", constraint);
         constraint_acc.update(&constraint);
     }
 
