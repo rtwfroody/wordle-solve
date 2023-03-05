@@ -1,6 +1,5 @@
 use clap::Parser;
 use indicatif::{ParallelProgressIterator, ProgressStyle};
-use lazy_static::lazy_static;
 use rayon::prelude::*;
 use sha2::{Sha256, Digest};
 use std::cmp;
@@ -270,10 +269,7 @@ fn read_words(path: &String, word_length: usize) -> (Vec<Word>, Vec<u8>)
 
 struct WordleSolver {
     words: Vec<Word>,
-}
-
-lazy_static! {
-    static ref FIRST_GUESS: Mutex<Option<usize>> = Mutex::new(None);
+    first_guess: Mutex<Option<usize>>
 }
 
 impl WordleSolver {
@@ -283,7 +279,7 @@ impl WordleSolver {
         let remaining_words = filter_words(constraint, &self.words);
 
         if remaining_words.len() == self.words.len() {
-            let first_guess = FIRST_GUESS.lock().unwrap();
+            let first_guess = self.first_guess.lock().unwrap();
             if let Some(index) = *first_guess {
                 return Ok(&self.words[index]);
             }
@@ -321,7 +317,7 @@ impl WordleSolver {
                     .unwrap();
 
         if remaining_words.len() == self.words.len() {
-            let mut first_guess = FIRST_GUESS.lock().unwrap();
+            let mut first_guess = self.first_guess.lock().unwrap();
             *first_guess = Some(index);
         }
 
@@ -375,6 +371,7 @@ fn main()
     let (words, _hash) = read_words(&cli.words.unwrap_or("words".to_string()), word_length);
     let solver = WordleSolver {
         words,
+        first_guess: Mutex::new(None)
     };
 
     if cli.test.is_some() {
