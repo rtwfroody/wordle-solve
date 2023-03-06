@@ -246,7 +246,7 @@ fn score_guess_count_eliminations(guess: &Word, words: &Vec<&Word>, constraint: 
     score
 }
 
-fn read_words(path: &String, word_length: usize) -> (Vec<Word>, Vec<u8>)
+fn read_words(path: &String) -> Result<(Vec<Word>, Vec<u8>), String>
 {
     let mut words = Vec::new();
     let mut hasher = Sha256::new();
@@ -256,15 +256,21 @@ fn read_words(path: &String, word_length: usize) -> (Vec<Word>, Vec<u8>)
         Err(error) => panic!("Failed to open {}: {:?}", path, error)
     };
 
+    let mut word_length = None;
     for line_result in io::BufReader::new(file).lines() {
         let line = line_result.unwrap();
-        if line.chars().count() != word_length {
-            continue;
+        let l1 = line.chars().count();
+        match word_length {
+            Some(l2) => if l1 != l2 {
+                return Err(format!("Some lines in {} contain {} characters while others contain {} characters (e.g. {}).",
+                    path, l1, l2, line));
+            },
+            None => word_length = Some(l1)
         }
         hasher.update(&line);
         words.push(Word::new(line));
     }
-    ( words, hasher.finalize().to_vec() )
+    Ok((words, hasher.finalize().to_vec()))
 }
 
 struct WordleSolver {
@@ -367,8 +373,8 @@ fn main()
 {
     let cli = Cli::parse();
 
-    let word_length = 5;
-    let (words, _hash) = read_words(&cli.words.unwrap_or("words".to_string()), word_length);
+    let (words, _hash) = read_words(&cli.words.unwrap_or("words".to_string())).unwrap();
+    let word_length = words.first().unwrap().len();
     let solver = WordleSolver {
         words,
         first_guess: Mutex::new(None)

@@ -1,8 +1,9 @@
 # Introduction
 
 wordle-solve finds the best wordle guess. Or at least it solves any word in the
-word list in 5 guess or fewer. It should work with any unicode list of words,
-so should work for any language where wordle makes sense.
+word list in 5 guess or fewer. It should work with any unicode list of words
+that all have the same length, so should work for any language where wordle
+makes sense.
 
 # Usage
 
