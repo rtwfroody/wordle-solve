@@ -372,32 +372,36 @@ impl WordleSolver {
 fn main()
 {
     let cli = Cli::parse();
+    let mut cache : HashMap<&Vec<u8>, usize> = HashMap::new();
 
-    let (words, _hash) = read_words(&cli.words.unwrap_or("words".to_string())).unwrap();
+    let (words, hash) = read_words(&cli.words.unwrap_or("words".to_string())).unwrap();
     let word_length = words.first().unwrap().len();
     let solver = WordleSolver {
         words,
-        first_guess: Mutex::new(None)
+        first_guess: Mutex::new(cache.get(&hash).copied())
     };
 
     if cli.test.is_some() {
         let answer = Word::new(cli.test.unwrap());
         solver.test(&answer, true);
-        return;
-    }
 
-    if cli.full_test {
+    } else if cli.full_test {
         solver.full_test();
         return;
+    } else {
+        let mut constraint_acc = Constraint::new(word_length);
+        for constraint_string in cli.constraint {
+            let constraint = Constraint::from_string(&constraint_string, word_length);
+            constraint_acc.update(&constraint);
+        }
+
+        let guess = solver.best_guess(&constraint_acc, true).unwrap();
+
+        println!("Best guess: {}", guess.word);
     }
 
-    let mut constraint_acc = Constraint::new(word_length);
-    for constraint_string in cli.constraint {
-        let constraint = Constraint::from_string(&constraint_string, word_length);
-        constraint_acc.update(&constraint);
+    let first_guess = *solver.first_guess.lock().unwrap();
+    if first_guess.is_some() {
+        cache.insert(&hash, first_guess.unwrap());
     }
-
-    let guess = solver.best_guess(&constraint_acc, true).unwrap();
-
-    println!("Best guess: {}", guess.word);
 }
