@@ -374,7 +374,7 @@ impl WordleSolver {
 fn main()
 {
     let cli = Cli::parse();
-    let cache_path = "wordle-solve.json";
+    let cache_path = "wordle-solve.cache";
     let cache_string = fs::read_to_string(cache_path).unwrap_or_default();
     let mut cache : HashMap<String, usize> = serde_json::from_str(cache_string.as_str()).unwrap_or_default();
 
@@ -408,5 +408,7 @@ fn main()
     if first_guess.is_some() {
         cache.insert(hash, first_guess.unwrap());
     }
-    println!("cache = {}", serde_json::to_string(&cache).unwrap());
+    let cache_data = serde_json::to_string(&cache).unwrap();
+    println!("cache = {}", &cache_data);
+    fs::write(cache_path, &cache_data).unwrap();
 }
