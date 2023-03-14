@@ -1,4 +1,5 @@
 use clap::Parser;
+use dirs;
 use hex;
 use indicatif::{ParallelProgressIterator, ProgressStyle};
 use rayon::prelude::*;
@@ -374,8 +375,9 @@ impl WordleSolver {
 fn main()
 {
     let cli = Cli::parse();
-    let cache_path = "wordle-solve.cache";
-    let cache_string = fs::read_to_string(cache_path).unwrap_or_default();
+    let mut cache_path = dirs::cache_dir().unwrap();
+    cache_path.push("wordle-solve.cache");
+    let cache_string = fs::read_to_string(&cache_path).unwrap_or_default();
     let mut cache : HashMap<String, usize> = serde_json::from_str(cache_string.as_str()).unwrap_or_default();
 
     let (words, hash) = read_words(&cli.words.unwrap_or("words".to_string())).unwrap();
@@ -409,6 +411,5 @@ fn main()
         cache.insert(hash, first_guess.unwrap());
     }
     let cache_data = serde_json::to_string(&cache).unwrap();
-    println!("cache = {}", &cache_data);
-    fs::write(cache_path, &cache_data).unwrap();
+    fs::write(&cache_path, &cache_data).unwrap();
 }
