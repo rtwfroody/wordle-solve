@@ -1,8 +1,10 @@
 use clap::Parser;
+use hex;
 use indicatif::{ParallelProgressIterator, ProgressStyle};
 use rayon::prelude::*;
+use serde_json;
 use sha2::{Sha256, Digest};
-use std::cmp;
+use std::{cmp, fs};
 use std::collections::{HashSet, HashMap};
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -246,7 +248,7 @@ fn score_guess_count_eliminations(guess: &Word, words: &Vec<&Word>, constraint: 
     score
 }
 
-fn read_words(path: &String) -> Result<(Vec<Word>, Vec<u8>), String>
+fn read_words(path: &String) -> Result<(Vec<Word>, String), String>
 {
     let mut words = Vec::new();
     let mut hasher = Sha256::new();
@@ -270,7 +272,7 @@ fn read_words(path: &String) -> Result<(Vec<Word>, Vec<u8>), String>
         hasher.update(&line);
         words.push(Word::new(line));
     }
-    Ok((words, hasher.finalize().to_vec()))
+    Ok((words, hex::encode(hasher.finalize())))
 }
 
 struct WordleSolver {
@@ -372,7 +374,9 @@ impl WordleSolver {
 fn main()
 {
     let cli = Cli::parse();
-    let mut cache : HashMap<&Vec<u8>, usize> = HashMap::new();
+    let cache_path = "wordle-solve.json";
+    let cache_string = fs::read_to_string(cache_path).unwrap_or_default();
+    let mut cache : HashMap<String, usize> = serde_json::from_str(cache_string.as_str()).unwrap_or_default();
 
     let (words, hash) = read_words(&cli.words.unwrap_or("words".to_string())).unwrap();
     let word_length = words.first().unwrap().len();
@@ -402,6 +406,7 @@ fn main()
 
     let first_guess = *solver.first_guess.lock().unwrap();
     if first_guess.is_some() {
-        cache.insert(&hash, first_guess.unwrap());
+        cache.insert(hash, first_guess.unwrap());
     }
+    println!("cache = {}", serde_json::to_string(&cache).unwrap());
 }
