@@ -320,6 +320,9 @@ impl WordleSolver {
                     .par_iter()
                     .progress_with_style(style)
                     .map(|guess| (score_guess_count_eliminations(guess, &remaining_words, constraint), guess))
+                    // Prefer words that might be the answer.
+                    .map(|(score, guess)|
+                        (score + if constraint.allows(guess) { 1 } else { 0 }, guess))
                     .enumerate()
                     .map(|(index, (score, guess))| (score, guess, index))
                     .max()
